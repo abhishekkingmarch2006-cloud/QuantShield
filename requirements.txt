@@ -6,3 +6,4 @@ ta
 pmdarima
 statsmodels
 seaborn
+wikipedia-api
