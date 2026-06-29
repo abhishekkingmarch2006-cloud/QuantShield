@@ -78,7 +78,7 @@ if ticker_input:
         # PART 1: GLOBAL TECH-TRACKING ENGINE (TECHNICAL ANALYSIS)
         # -------------------------------------------------------------
         st.markdown("---")
-        st.header("📈 Part 1: TradingView-Style Technical Analysis")
+        st.header("📈 Technical Analysis")
         
         df = hist_data.copy()
         
@@ -142,7 +142,7 @@ if ticker_input:
         # PART 2: GLOBAL SCREENER ENGINE (FUNDAMENTALS & STATEMENTS)
         # -------------------------------------------------------------
         st.markdown("---")
-        st.header("📊 Part 2: Screener-Style Valuation & Financial Statements")
+        st.header("📊Valuation & Financial Statements")
         
         # Metrics Matrix Summary Display
         if info:
