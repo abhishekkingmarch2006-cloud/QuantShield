@@ -2,4 +2,4 @@ streamlit
 yfinance
 pandas
 matplotlib
-pandas_ta
+ta
