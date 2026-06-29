@@ -1,6 +1,8 @@
-streamlit 
-yfinance 
-pandas 
-ta
+streamlit
+yfinance
+pandas
 matplotlib
-seaborn 
+ta
+pmdarima
+statsmodels
+seaborn
