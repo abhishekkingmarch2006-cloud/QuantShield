@@ -115,7 +115,9 @@ if ticker_input:
                 f"and updated below."
             )
         
-        with st.expander("📋 View Summary Profile Description", expanded=True):
+       # Changed the expander header label to "About the Company"
+        with st.expander("📋 About the Company", expanded=True):
+            st.markdown(f"### Corporate Overview")
             st.write(business_summary)
 
         # -------------------------------------------------------------
