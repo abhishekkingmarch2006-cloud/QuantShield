@@ -54,17 +54,24 @@ if ticker_input:
         close_series.index = pd.to_datetime(close_series.index).tz_localize(None)
         close_series = close_series.astype(float)
 
+       # -------------------------------------------------------------
+        # BRANDING HEADER: LOGO & DESCRIPTION (FIXED INDENTATION)
         # -------------------------------------------------------------
-        # CORPORATE BRANDING EXTRACTION
-        # -------------------------------------------------------------
+        st.markdown("---")
+        
+        # Create columns layout securely
+        head_col1, head_col2 = st.columns([1, 6])
+        
+        company_name = info.get('longName', ticker_upper)
+        website = info.get('website', '')
+        currency_label = info.get('currency', 'Units')
+        
         with head_col1:
             if website:
-                # Advanced domain cleaning to ensure Clearbit API can read the URL format
                 clean_domain = website.lower().strip()
                 for prefix in ["https://", "http://", "www."]:
                     if clean_domain.startswith(prefix):
                         clean_domain = clean_domain[len(prefix):]
-                # Split at the first slash to isolate just the root domain name (e.g., relianceindustries.com)
                 clean_domain = clean_domain.split('/')[0]
                 
                 logo_url = f"https://logo.clearbit.com/{clean_domain}?size=120"
@@ -74,6 +81,17 @@ if ticker_input:
                     st.markdown("## 🏢")
             else:
                 st.markdown("## 🏢")
+                
+        with head_col2:
+            st.title(company_name)
+            if website: 
+                st.markdown(f"🔗 [Visit Official Website]({website})")
+            
+        # Extract description using multiple fallback keys securely
+        business_summary = info.get('longBusinessSummary', info.get('description', 'No corporate summary description available.'))
+        
+        with st.expander("📋 View Summary Profile Description", expanded=True):
+            st.write(business_summary)
         # -------------------------------------------------------------
         # TECHNICAL TRACKING ENGINE
         # -------------------------------------------------------------
