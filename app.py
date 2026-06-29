@@ -8,53 +8,57 @@ from pmdarima import auto_arima
 from datetime import datetime
 
 # Page configuration
-st.set_page_config(page_title="Global Financial Command Center", layout="wide")
-st.title("🌐 Global Stock Fundamental, Technical & 5-Year Forecasting Hub")
-st.write("Analyze any stock worldwide. Enter the exact global ticker symbol to pull company branding, descriptions, core statements, technical charts, and 5-year predictive engines.")
+st.set_page_config(page_title="Global Finance Hub", layout="wide")
+st.title("🌐 Integrated Global Stock Analysis & Forecasting Dashboard")
+st.write("Track any stock worldwide. Enter the exact ticker symbol to view profile details, clean technical analysis indicators, and 5-year data projections.")
 
-# 1. Global Ticker Search Setup
-st.sidebar.header("Global Search Configuration")
-ticker_input = st.sidebar.text_input(
-    "Enter Global Stock Ticker:", 
-    value="RELIANCE.NS"
-).strip()
+# 1. Sidebar Config
+st.sidebar.header("Search Parameters")
+ticker_input = st.sidebar.text_input("Enter Global Ticker Symbol:", value="RELIANCE.NS").strip()
 
 st.sidebar.markdown("""
-**💡 Global Ticker Quick Guide:**
-* **Indian Stocks (NSE):** Add `.NS` (e.g., `TCS.NS`, `RELIANCE.NS`)
-* **US Stocks (NASDAQ/NYSE):** Type directly (e.g., `AAPL`, `TSLA`)
-* **UK Stocks (London):** Add `.L` (e.g., `VOD.L`)
+**💡 Quick Suffix Guide:**
+* **Indian NSE:** Add `.NS` (e.g., `RELIANCE.NS`, `TCS.NS`)
+* **US NASDAQ/NYSE:** Type directly (e.g., `AAPL`, `TSLA`)
+* **UK London Market:** Add `.L` (e.g., `VOD.L`)
 """)
 
 if ticker_input:
     ticker_upper = ticker_input.upper()
     
-    with st.spinner("Fetching global market data and profile metrics from Yahoo Finance..."):
+    with st.spinner("Fetching market telemetry from data streams..."):
         ticker_obj = yf.Ticker(ticker_input)
-        # Pull 5 years of daily historical data to support both technical charts and long-term ARIMA forecasting models
+        # 5-Year data download covers our historical baseline and long term ARIMA limits
         hist_data = ticker_obj.history(period="5y")
         
-        # Pull company profile details Safely
         try:
             info = ticker_obj.info
         except Exception:
             info = {}
 
     if hist_data.empty:
-        st.error(f"❌ Could not retrieve market data for '{ticker_input}'. Please check the ticker formatting suffix rules on the sidebar.")
+        st.error(f"❌ No asset data found for symbol '{ticker_input}'. Ensure the ticker layout match market rules.")
     else:
-        # Flatten MultiIndex columns if returned by yfinance
-        if isinstance(hist_data.columns, pd.MultiIndex):
-            hist_data.columns = [col[0] for col in hist_data.columns]
+        # -------------------------------------------------------------
+        # ⚡ CRITICAL DATA EXTRACTION ENGINE (FIX FOR INDIAN MULTIINDEX)
+        # -------------------------------------------------------------
+        df = hist_data.copy()
         
-        hist_data = hist_data.loc[:, ~hist_data.columns.duplicated()].copy()
+        # If columns contain MultiIndex tiers (Common with Indian markets via yfinance), extract the 'Close' slice explicitly
+        if isinstance(df.columns, pd.MultiIndex):
+            close_series = df['Close'][ticker_upper].dropna() if ticker_upper in df['Close'].columns else df['Close'].iloc[:, 0].dropna()
+        else:
+            close_series = df['Close'].dropna()
+            
+        # Convert index safely to clean timezone-naive datetimes
+        close_series.index = pd.to_datetime(close_series.index).tz_localize(None)
+        close_series = close_series.astype(float)
 
         # -------------------------------------------------------------
-        # BRANDING HEADER: LOGO & DESCRIPTION
+        # CORPORATE BRANDING EXTRACTION
         # -------------------------------------------------------------
         st.markdown("---")
-        head_col1, head_col2 = st.columns([1, 5])
-        
+        head_col1, head_col2 = st.columns([1, 6])
         company_name = info.get('longName', ticker_upper)
         website = info.get('website', '')
         currency_label = info.get('currency', 'Units')
@@ -63,204 +67,165 @@ if ticker_input:
             if website:
                 clean_domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split('/')[0]
                 logo_url = f"https://logo.clearbit.com/{clean_domain}?size=120"
-                try:
-                    st.image(logo_url, width=120)
-                except Exception:
-                    st.markdown("## 🏢")
+                try: st.image(logo_url, width=120)
+                except Exception: st.markdown("## 🏢")
             else:
                 st.markdown("## 🏢")
                 
         with head_col2:
             st.title(company_name)
-            if website:
-                st.markdown(f"🔗 [Visit Official Website]({website})")
-                
-        st.subheader("📋 Company Profile & Business Summary")
-        business_summary = info.get('longBusinessSummary', 'No company description profile summary found.')
-        st.write(business_summary)
-        
+            if website: st.markdown(f"🔗 [Visit Official Website]({website})")
+            
+        with st.expander("📋 View Summary Profile Description"):
+            st.write(info.get('longBusinessSummary', 'No corporate summary description available for this asset index tier.'))
+
         # -------------------------------------------------------------
-        # PART 1: TECHNICAL ANALYSIS ENGINE & 5-YEAR PRICE FORECAST
+        # TECHNICAL TRACKING ENGINE
         # -------------------------------------------------------------
         st.markdown("---")
-        st.header("📈 Part 1: TradingView Technical Analysis & 5-Year Price Forecast")
+        st.header("📈 Technical Analysis & Price Forecasting Engine")
         
-        df = hist_data.copy()
-        close_series = pd.Series(df['Close'].values, index=df.index).astype(float)
+        # Pull 1 Year subset out of the cleaned series for the layout tracking view
+        close_1y = close_series.tail(252)
         
-        # Calculate Technical Indicators (using the last 1 year of data for clear visualization)
-        df_1y = df.tail(252).copy()
-        close_1y = pd.Series(df_1y['Close'].values, index=df_1y.index).astype(float)
-        df_1y['SMA_50'] = ta.trend.sma_indicator(close_1y, window=50)
-        df_1y['EMA_20'] = ta.trend.ema_indicator(close_1y, window=20)
-        df_1y['RSI'] = ta.momentum.rsi(close_1y, window=14)
-
-        latest_close = float(close_series.iloc[-1])
-        latest_rsi = float(df_1y['RSI'].iloc[-1]) if not pd.isna(df_1y['RSI'].iloc[-1]) else 50.0
-        latest_sma50 = df_1y['SMA_50'].iloc[-1]
+        # Calculate clean indicator paths
+        sma_50 = ta.trend.sma_indicator(close_1y, window=50)
+        ema_20 = ta.trend.ema_indicator(close_1y, window=20)
+        rsi_14 = ta.momentum.rsi(close_1y, window=14)
         
-        t_col1, t_col2, t_col3 = st.columns(3)
-        t_col1.metric("Current Closing Price", f"{latest_close:.2f} {currency_label}")
+        # Metric indicators layout cards row
+        latest_close = close_1y.iloc[-1]
+        latest_rsi = rsi_14.iloc[-1] if not pd.isna(rsi_14.iloc[-1]) else 50.0
+        latest_sma = sma_50.iloc[-1]
         
-        rsi_status = "Neutral"
-        if latest_rsi >= 70: rsi_status = "🔴 Overbought"
-        elif latest_rsi <= 30: rsi_status = "🟢 Oversold"
-        t_col2.metric("RSI (14-Day)", f"{latest_rsi:.2f}", delta=rsi_status, delta_color="off")
+        m_col1, m_col2, m_col3 = st.columns(3)
+        m_col1.metric("Current Market Price", f"{latest_close:.2f} {currency_label}")
         
-        if not pd.isna(latest_sma50):
-            trend_status = "Bullish Track" if latest_close > latest_sma50 else "Bearish Track"
-            t_col3.metric("50-Day Moving Average", f"{latest_sma50:.2f} {currency_label}", delta=trend_status)
+        rsi_delta = "🔴 Overbought" if latest_rsi >= 70 else "🟢 Oversold" if latest_rsi <= 30 else "Neutral"
+        m_col2.metric("RSI (14-Day Baseline)", f"{latest_rsi:.2f}", delta=rsi_delta, delta_color="off")
+        
+        if not pd.isna(latest_sma):
+            trend_delta = "Bullish Track" if latest_close > latest_sma else "Bearish Track"
+            m_col3.metric("50-Day Moving Average", f"{latest_sma:.2f} {currency_label}", delta=trend_delta)
         else:
-            t_col3.metric("50-Day Moving Average", "Calculating...")
+            m_col3.metric("50-Day Moving Average", "Processing Setup...")
 
-        # Technical Charts
-        st.subheader("📉 1-Year Technical Indicators Window")
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 6), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-        ax1.plot(df_1y.index, close_1y.values, label="Close Price", color="black", linewidth=1.5)
-        ax1.plot(df_1y.index, df_1y['EMA_20'].values, label="20 EMA", color="orange", linestyle="--")
-        if not pd.isna(latest_sma50):
-            ax1.plot(df_1y.index, df_1y['SMA_50'].values, label="50 SMA", color="blue", linestyle="-.")
-        ax1.set_ylabel(f"Price ({currency_label})")
-        ax1.legend(loc="upper left")
-        ax1.grid(True, alpha=0.3)
+        # DE-CLUTTER TABS: Split current active charting and long term prediction engines
+        tech_tab1, tech_tab2 = st.tabs(["📊 1-Year Active Tracking Charts", "🔮 5-Year Statistical Projections"])
         
-        ax2.plot(df_1y.index, df_1y['RSI'].values, label="RSI", color="purple")
-        ax2.axhline(70, color="red", linestyle=":")
-        ax2.axhline(30, color="green", linestyle=":")
-        ax2.set_ylabel("RSI Range")
-        ax2.set_ylim(10, 90)
-        ax2.grid(True, alpha=0.3)
-        st.pyplot(fig)
-        plt.close(fig)
-
-        # 🚀 5-YEAR ARIMA PRICE FORECASTING SUB-ENGINE
-        st.subheader("🔮 5-Year Technical Price Projection (ARIMA)")
-        with st.spinner("Running Auto-ARIMA optimization models across 5 years of timeline history..."):
-            try:
-                # Resample historical data to weekly frequencies to handle long horizon limits safely
-                df_weekly = close_series.resample('W-MON').mean().dropna()
-                model = auto_arima(df_weekly, seasonal=False, error_action='ignore', suppress_warnings=True)
-                fitted_model = model.fit(df_weekly)
-                
-                # Forecast 260 weeks forward (~5 Years into 2031)
-                forecast_periods = 260
-                forecast_values, conf_int = fitted_model.predict(n_periods=forecast_periods, return_conf_int=True)
-                forecast_index = pd.date_range(start=df_weekly.index[-1] + pd.DateOffset(weeks=1), periods=forecast_periods, freq='W-MON')
-                
-                forecast_series = pd.Series(forecast_values, index=forecast_index)
-                
-                f_col1, f_col2 = st.columns([2, 1])
-                with f_col1:
-                    fig_arima, ax_arima = plt.subplots(figsize=(10, 5))
-                    ax_arima.plot(df_weekly.index, df_weekly.values, label="Historical Close", color="blue")
-                    ax_arima.plot(forecast_series.index, forecast_series.values, label="ARIMA Forecast", color="red", linestyle="--")
-                    ax_arima.fill_between(forecast_series.index, conf_int[:, 0], conf_int[:, 1], color='pink', alpha=0.3, label='Confidence Interval')
-                    ax_arima.set_title(f"5-Year Price Trajectory Model (ARIMA Order: {model.order})")
-                    ax_arima.set_ylabel(f"Price ({currency_label})")
-                    ax_arima.legend(loc="upper left")
-                    ax_arima.grid(True, alpha=0.3)
-                    st.pyplot(fig_arima)
-                    plt.close(fig_arima)
-                
-                with f_col2:
-                    fig_hist, ax_hist = plt.subplots(figsize=(5, 5))
-                    sns.histplot(forecast_series, kde=True, ax=ax_hist, color="crimson", bins=15)
-                    ax_hist.set_title("Forecast Price Distribution Density")
-                    ax_hist.set_xlabel(f"Projected Price ({currency_label})")
-                    st.pyplot(fig_hist)
-                    plt.close(fig_hist)
+        with tech_tab1:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 7), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+            
+            ax1.plot(close_1y.index, close_1y.values, label="Closing Price", color="black", linewidth=1.5)
+            ax1.plot(close_1y.index, ema_20.values, label="20 EMA", color="orange", linestyle="--")
+            if not sma_50.dropna().empty:
+                ax1.plot(close_1y.index, sma_50.values, label="50 SMA", color="blue", linestyle="-.")
+            ax1.set_title(f"{ticker_upper} Technical Trajectory Chart")
+            ax1.set_ylabel(f"Price ({currency_label})")
+            ax1.legend(loc="upper left")
+            ax1.grid(True, alpha=0.2)
+            
+            ax2.plot(close_1y.index, rsi_14.values, label="RSI Line", color="purple")
+            ax2.axhline(70, color="red", linestyle=":", alpha=0.5)
+            ax2.axhline(30, color="green", linestyle=":", alpha=0.5)
+            ax2.set_ylabel("RSI Value")
+            ax2.set_ylim(10, 90)
+            ax2.grid(True, alpha=0.2)
+            st.pyplot(fig)
+            plt.close(fig)
+            
+        with tech_tab2:
+            with st.spinner("Executing Auto-ARIMA math structures across weekly historical aggregates..."):
+                try:
+                    # Sample weekly to keep long projections visually clean and fast
+                    weekly_series = close_series.resample('W-MON').mean().dropna()
+                    model = auto_arima(weekly_series, seasonal=False, error_action='ignore', suppress_warnings=True)
+                    fitted = model.fit(weekly_series)
                     
-                # Show annual checkpoint text targets
-                annual_targets = forecast_series.resample('YE').last()
-                st.markdown("**Predicted Long-Term Price Checkpoints:**")
-                checkpoint_cols = st.columns(len(annual_targets.index))
-                for idx, year_date in enumerate(annual_targets.index):
-                    checkpoint_cols[idx].metric(f"Year {year_date.strftime('%Y')} Target", f"{annual_targets.iloc[idx]:.2f} {currency_label}")
-            except Exception as e:
-                st.warning(f"Technical forecasting model computation timed out: {e}")
+                    # Project 260 weeks out (~5 Years)
+                    forecast_val, conf_int = fitted.predict(n_periods=260, return_conf_int=True)
+                    forecast_idx = pd.date_range(start=weekly_series.index[-1] + pd.DateOffset(weeks=1), periods=260, freq='W-MON')
+                    f_series = pd.Series(forecast_val, index=forecast_idx)
+                    
+                    p_col1, p_col2 = st.columns([2, 1])
+                    with p_col1:
+                        fig_arima, ax_arima = plt.subplots(figsize=(10, 5))
+                        ax_arima.plot(weekly_series.index, weekly_series.values, label="Historical Data", color="blue")
+                        ax_arima.plot(f_series.index, f_series.values, label="ARIMA Path Prediction", color="red", linestyle="--")
+                        ax_arima.fill_between(f_series.index, conf_int[:, 0], conf_int[:, 1], color='pink', alpha=0.3, label='Confidence Frame')
+                        ax_arima.set_ylabel(f"Price ({currency_label})")
+                        ax_arima.legend(loc="upper left")
+                        ax_arima.grid(True, alpha=0.2)
+                        st.pyplot(fig_arima)
+                        plt.close(fig_arima)
+                    with p_col2:
+                        fig_hist, ax_hist = plt.subplots(figsize=(5, 5))
+                        sns.histplot(f_series, kde=True, color="teal", ax=ax_hist)
+                        ax_hist.set_title("Forecast Value Density Distribution")
+                        st.pyplot(fig_hist)
+                        plt.close(fig_hist)
+                        
+                    # Target checkpoints breakdown
+                    st.markdown("**Predicted Price Checkpoints (Year-End Targets):**")
+                    checkpoints = f_series.resample('YE').last()
+                    c_cols = st.columns(len(checkpoints))
+                    for idx, yr in enumerate(checkpoints.index):
+                        c_cols[idx].metric(f"{yr.strftime('%Y')} Target", f"{checkpoints.iloc[idx]:.2f} {currency_label}")
+                except Exception as e:
+                    st.warning(f"Forecasting model execution skipped: {e}")
 
         # -------------------------------------------------------------
-        # PART 2: FUNDAMENTALS ENGINE & 5-YEAR GROWTH PROJECTIONS
+        # FUNDAMENTALS ENGINE
         # -------------------------------------------------------------
         st.markdown("---")
-        st.header("📊 Part 2: Screener Valuation, Statements & 5-Year Fundamental Growth Forecast")
+        st.header("📊 Part 2: Fundamental Statements & Corporate Growth Forecast")
         
         income_statement = ticker_obj.financials
         balance_sheet = ticker_obj.balance_sheet
         cash_flow = ticker_obj.cashflow
-
-        # Valuation Metric Row
+        
         if info:
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            raw_market_cap = info.get('marketCap', 0)
-            
-            if raw_market_cap:
-                if currency_label == "INR":
-                    formatted_mcap = f"₹ {raw_market_cap / 10000000:.2f} Cr"
-                else:
-                    formatted_mcap = f"{raw_market_cap / 1000000000:.2f} B {currency_label}"
+            raw_mcap = info.get('marketCap', 0)
+            if raw_mcap:
+                formatted_mcap = f"₹ {raw_mcap / 10000000:.2f} Cr" if currency_label == "INR" else f"{raw_mcap / 1000000000:.2f} B {currency_label}"
             else:
                 formatted_mcap = "N/A"
-                
-            f_col1.metric("Market Cap (Local Currency)", formatted_mcap)
+            f_col1.metric("Market Capitalization", formatted_mcap)
             f_col2.metric("P/E Ratio", f"{info.get('trailingPE', 'N/A')}")
             f_col3.metric("P/B Ratio", f"{info.get('priceToBook', 'N/A')}")
             f_col4.metric("Return on Equity (ROE)", f"{info.get('returnOnEquity', 0)*100:.2f}%" if info.get('returnOnEquity') else "N/A")
 
-        # 🚀 5-YEAR FUNDAMENTAL FORECAST SUB-ENGINE (CAGR PROJECTIONS)
-        st.subheader("📈 5-Year Corporate Revenue & Profit Projections")
+        # Projections Sub-Engine
+        st.subheader("📈 5-Year Statement Value Trajectory Projections")
         if income_statement is not None and not income_statement.empty and income_statement.shape[1] >= 2:
             try:
-                # Extract Revenue and Net Income rows safely matching modern yfinance layouts
-                revenue_row = income_statement.loc['Total Revenue'] if 'Total Revenue' in income_statement.index else income_statement.loc['Revenue'] if 'Revenue' in income_statement.index else pd.Series()
-                net_income_row = income_statement.loc['Net Income'] if 'Net Income' in income_statement.index else pd.Series()
-                
-                if not revenue_row.empty and len(revenue_row) >= 2:
-                    # Clean arrays ordered chronological (oldest to newest)
-                    rev_values = revenue_row.dropna().values[::-1]
-                    net_values = net_income_row.dropna().values[::-1] if not net_income_row.empty else []
+                rev_label = 'Total Revenue' if 'Total Revenue' in income_statement.index else 'Revenue' if 'Revenue' in income_statement.index else None
+                if rev_label:
+                    rev_vals = income_statement.loc[rev_label].dropna().values[::-1]
+                    n = min(3, len(rev_vals)-1)
+                    cagr = ((rev_vals[-1] / rev_vals[-1-n]) ** (1/n)) - 1
+                    cagr = max(min(cagr, 0.25), -0.15) # Cap boundaries to keep visualization logical
                     
-                    # Calculate basic 3-Year CAGR trend
-                    n_years = min(3, len(rev_values) - 1)
-                    cagr_rev = ((rev_values[-1] / rev_values[-1 - n_years]) ** (1 / n_years)) - 1
-                    
-                    # Prevent extreme CAGR distortions from skewed volatile data years
-                    cagr_rev = max(min(cagr_rev, 0.25), -0.15) 
-                    
-                    # Build 5-Year projections data frames
-                    base_year = datetime.today().year
-                    projection_years = [str(base_year + i) for i in range(1, 6)]
-                    
-                    projected_revenue = []
-                    current_rev = rev_values[-1]
-                    for i in range(5):
-                        current_rev *= (1 + cagr_rev)
-                        projected_revenue.append(current_rev)
+                    proj_years = [str(datetime.today().year + i) for i in range(1, 6)]
+                    proj_rev = []
+                    curr_rev = rev_vals[-1]
+                    for _ in range(5):
+                        curr_rev *= (1 + cagr)
+                        proj_rev.append(curr_rev)
                         
-                    fund_df = pd.DataFrame({
-                        'Year': projection_years,
-                        'Projected Total Revenue': projected_revenue
-                    }).set_index('Year')
-                    
-                    # Scale display labels cleanly based on local currency denominations
                     scale_factor = 10000000 if currency_label == "INR" else 1000000000
-                    scale_text = "Crores (Cr)" if currency_label == "INR" else "Billions (B)"
+                    scale_lbl = "Crores (Cr)" if currency_label == "INR" else "Billions (B)"
                     
-                    st.write(f"Projections calculated using a baseline historical revenue trend CAGR of **{cagr_rev*100:.2f}%**. Figures are adjusted in **{scale_text}**:")
-                    
-                    # Display metrics row
-                    st.dataframe((fund_df / scale_factor).round(2).T, use_container_width=True)
-            except Exception as fe:
-                st.info("Fundamental metrics structure is too volatile to compute standardized CAGR projections automatically.")
-        else:
-            st.info("Insufficient statement history rows to compile 5-year CAGR growth trajectories.")
+                    st.write(f"Estimated revenue trajectory using a calculated 3-year historical baseline CAGR of **{cagr*100:.2f}%** (Values in **{scale_lbl}**):")
+                    proj_df = pd.DataFrame({'Year': proj_years, 'Projected Total Revenue': proj_rev}).set_index('Year')
+                    st.dataframe((proj_df / scale_factor).round(2).T, use_container_width=True)
+            except Exception:
+                st.info("Statement row variances are too high to compile reliable forward growth metrics.")
 
-        # Core Data Sheets Table Tabs
-        st.subheader("📋 Core Financial Statements Data Grid")
-        tab1, tab2, tab3 = st.tabs(["Income Statement (P&L)", "Balance Sheet", "Cash Flow Statement"])
-        with tab1:
-            st.dataframe(income_statement.dropna(how='all') if income_statement is not None else pd.DataFrame(), use_container_width=True)
-        with tab2:
-            st.dataframe(balance_sheet.dropna(how='all') if balance_sheet is not None else pd.DataFrame(), use_container_width=True)
-        with tab3:
-            st.dataframe(cash_flow.dropna(how='all') if cash_flow is not None else pd.DataFrame(), use_container_width=True)
+        # Data sheets tabs view
+        st.subheader("📋 Core Financial Statements Grid")
+        stmt_tab1, stmt_tab2, stmt_tab3 = st.tabs(["Income Statement", "Balance Sheet", "Cash Flow"])
+        with stmt_tab1: st.dataframe(income_statement.dropna(how='all') if income_statement is not None else pd.DataFrame(), use_container_width=True)
+        with stmt_tab2: st.dataframe(balance_sheet.dropna(how='all') if balance_sheet is not None else pd.DataFrame(), use_container_width=True)
+        with stmt_tab3: st.dataframe(cash_flow.dropna(how='all') if cash_flow is not None else pd.DataFrame(), use_container_width=True)
