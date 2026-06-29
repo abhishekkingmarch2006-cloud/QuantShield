@@ -56,13 +56,18 @@ if ticker_input:
         website = info.get('website', '')
         
         with head_col1:
-            # Generate a dynamic high-quality logo link using Clearbit API based on company website domain
+            # Check if a website exists to safely fetch the logo
             if website:
                 clean_domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split('/')[0]
                 logo_url = f"https://logo.clearbit.com/{clean_domain}?size=120"
-                st.image(logo_url, width=120, fallback="🏢")
+                
+                # Wrap in a try-except block so an invalid URL won't crash the app
+                try:
+                    st.image(logo_url, width=120)
+                except Exception:
+                    st.markdown("## 🏢") # Fallback to emoji if the image download fails
             else:
-                st.write("### 🏢")
+                st.markdown("## 🏢") # Fallback to emoji if no website exists
                 
         with head_col2:
             st.title(company_name)
