@@ -8,7 +8,7 @@ from datetime import datetime
 # Page configuration
 st.set_page_config(page_title="Global Financial Command Center", layout="wide")
 st.title("🌐 Global Stock Fundamental & Technical Analysis Hub")
-st.write("Analyze any stock worldwide. Enter the exact global ticker symbol to pull complete Screener-style statements and active technical tracking indicators.")
+st.write("Analyze any stock worldwide. Enter the exact global ticker symbol to pull company branding, descriptions, core statements, and technical charts.")
 
 # 1. Global Ticker Search Setup
 st.sidebar.header("Global Search Configuration")
@@ -19,19 +19,16 @@ ticker_input = st.sidebar.text_input(
 
 st.sidebar.markdown("""
 **💡 Global Ticker Quick Guide:**
-* **Indian Stocks (NSE):** Add `.NS` (e.g., `TCS.NS`, `HDFCBANK.NS`)
-* **US Stocks (NASDAQ/NYSE):** Type directly (e.g., `AAPL`, `TSLA`, `MSFT`)
+* **Indian Stocks (NSE):** Add `.NS` (e.g., `TCS.NS`, `RELIANCE.NS`)
+* **US Stocks (NASDAQ/NYSE):** Type directly (e.g., `AAPL`, `TSLA`)
 * **UK Stocks (London):** Add `.L` (e.g., `VOD.L`)
-* **Canadian Stocks:** Add `.TO` (e.g., `SHOP.TO`)
 """)
 
 if ticker_input:
-    st.markdown(f"## Data Overview for Ticker: **{ticker_input.upper()}**")
+    ticker_upper = ticker_input.upper()
     
-    with st.spinner("Fetching global market data and statements from Yahoo Finance..."):
+    with st.spinner("Fetching global market data and profile metrics from Yahoo Finance..."):
         ticker_obj = yf.Ticker(ticker_input)
-        
-        # Pull 1 year of daily historical data for technical indicators
         hist_data = ticker_obj.history(period="1y")
         
         # Pull company profile details Safely
@@ -48,9 +45,40 @@ if ticker_input:
             hist_data.columns = hist_data.columns.get_level_values(0)
             
         # -------------------------------------------------------------
+        # BRANDING HEADER: LOGO & DESCRIPTION
+        # -------------------------------------------------------------
+        st.markdown("---")
+        
+        # Setup columns for Logo + Title
+        head_col1, head_col2 = st.columns([1, 5])
+        
+        company_name = info.get('longName', ticker_upper)
+        website = info.get('website', '')
+        
+        with head_col1:
+            # Generate a dynamic high-quality logo link using Clearbit API based on company website domain
+            if website:
+                clean_domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split('/')[0]
+                logo_url = f"https://logo.clearbit.com/{clean_domain}?size=120"
+                st.image(logo_url, width=120, fallback="🏢")
+            else:
+                st.write("### 🏢")
+                
+        with head_col2:
+            st.title(company_name)
+            if website:
+                st.markdown(f"🔗 [Visit Official Website]({website})")
+                
+        # Render Company Description
+        st.subheader("📋 Company Profile & Business Summary")
+        business_summary = info.get('longBusinessSummary', 'No company description profile summary found for this asset index tier.')
+        st.write(business_summary)
+        
+        # -------------------------------------------------------------
         # PART 1: GLOBAL TECH-TRACKING ENGINE (TECHNICAL ANALYSIS)
         # -------------------------------------------------------------
-        st.header("📈Technical Analysis")
+        st.markdown("---")
+        st.header("📈 Part 1: TradingView-Style Technical Analysis")
         
         df = hist_data.copy()
         
@@ -63,11 +91,8 @@ if ticker_input:
         # Extract latest metrics for indicators
         latest_close = float(df['Close_Clean'].iloc[-1])
         latest_rsi = float(df['RSI'].iloc[-1]) if not pd.isna(df['RSI'].iloc[-1]) else 50.0
-        
-        # Check fallback if 50 days of data aren't fully populated yet
         latest_sma50 = df['SMA_50'].iloc[-1]
-        sma_display = f"{latest_sma50:.2f}" if not pd.isna(latest_sma50) else "Calculating..."
-
+        
         t_col1, t_col2, t_col3 = st.columns(3)
         currency_label = info.get('currency', 'Units')
         t_col1.metric("Current Closing Price", f"{latest_close:.2f} {currency_label}")
@@ -81,11 +106,10 @@ if ticker_input:
             trend_status = "Bullish Track" if latest_close > latest_sma50 else "Bearish Track"
             t_col3.metric("50-Day Moving Average", f"{latest_sma50:.2f} {currency_label}", delta=trend_status)
         else:
-            t_col3.metric("50-Day Moving Average", sma_display)
+            t_col3.metric("50-Day Moving Average", "Calculating...")
 
         # Plot Visual Technical Graphs
         st.subheader("📉 Technical Charts Tracking Window")
-        
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         
         # Plot 1: Close prices and Moving Averages
@@ -95,7 +119,7 @@ if ticker_input:
         if not pd.isna(latest_sma50):
             ax1.plot(df.index, df['SMA_50'].values, label="50 SMA (Medium Term)", color="blue", linestyle="-.")
             
-        ax1.set_title(f"{ticker_input.upper()} Historical Technical Trajectory Chart", fontsize=12)
+        ax1.set_title(f"{ticker_upper} Historical Technical Trajectory Chart", fontsize=12)
         ax1.set_ylabel(f"Price ({currency_label})")
         ax1.legend(loc="upper left")
         ax1.grid(True, alpha=0.3)
@@ -118,13 +142,12 @@ if ticker_input:
         # PART 2: GLOBAL SCREENER ENGINE (FUNDAMENTALS & STATEMENTS)
         # -------------------------------------------------------------
         st.markdown("---")
-        st.header("📊 FUNDAMENTALS Valuation & Financial Statements")
+        st.header("📊 Part 2: Screener-Style Valuation & Financial Statements")
         
         # Metrics Matrix Summary Display
         if info:
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             
-            # Formatted extractions
             raw_market_cap = info.get('marketCap', 0)
             display_cap = f"{raw_market_cap:,}" if raw_market_cap else "N/A"
             
@@ -141,8 +164,6 @@ if ticker_input:
             f_col2.metric("P/E Ratio", pe_display)
             f_col3.metric("P/B Ratio", pb_display)
             f_col4.metric("Return on Equity (ROE)", roe_display)
-        else:
-            st.info("ℹ️ Valuation summary cards are not fully available for this asset index tier. Showing structural corporate reports below.")
 
         # Complete Financial Statements Render tabs
         st.subheader("📋 Core Financial Statements")
