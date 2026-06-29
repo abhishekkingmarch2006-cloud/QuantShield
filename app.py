@@ -50,7 +50,8 @@ if ticker_input:
         close_series = close_series.astype(float)
 
         # -------------------------------------------------------------
-        # 🏛️ ADVANCED LOGO & DESCRIPTION FALLBACK ENGINE
+       # -------------------------------------------------------------
+        # 🏛️ ADVANCED LOGO & DEEP BUSINESS DESCRIPTION GENERATOR
         # -------------------------------------------------------------
         st.markdown("---")
         head_col1, head_col2 = st.columns([1, 6])
@@ -76,7 +77,6 @@ if ticker_input:
                 except Exception:
                     pass
             
-            # Fallback 1: Try fetching via DuckDuckGo Instant Brand Assets if Clearbit fails
             if not logo_success:
                 try:
                     search_name = company_name.split()[0].lower()
@@ -86,7 +86,6 @@ if ticker_input:
                 except Exception:
                     pass
                     
-            # Fallback 2: Default to generic building graphic
             if not logo_success:
                 st.markdown("## 🏢")
                 
@@ -97,29 +96,40 @@ if ticker_input:
             else:
                 st.markdown(f"📍 Market Symbol: `{ticker_upper}` | Currency: `{currency_label}`")
             
-        # Smart Fallback for Summary Profile Description
+        # ⚡ DETAILED DESCRIPTION EXTRACTOR
         business_summary = info.get('longBusinessSummary', info.get('description', ''))
         
-        if not business_summary or len(business_summary) < 10:
-            # Build a dynamic overview using available classification metadata tags
-            sector = info.get('sector', 'Global Markets')
-            industry = info.get('industry', 'Financial Assets')
-            country = info.get('country', 'International Exchange')
-            exchange = info.get('exchange', 'Public Exchange')
-            
-            business_summary = (
-                f"**{company_name}** is a publicly traded corporate entity listed under ticker symbol **{ticker_upper}** "
-                f"on the **{exchange}**. The organization operationally falls within the **{sector}** sector, specializing "
-                f"closely in the **{industry}** industrial market category. Headquartered primarily within **{country}**, "
-                f"the stock's telemetry, valuation metrics, and underlying capital balances are actively maintained "
-                f"and updated below."
-            )
-        
-       # Changed the expander header label to "About the Company"
-        with st.expander("📋 About the Company", expanded=True):
-            st.markdown(f"### Corporate Overview")
-            st.write(business_summary)
+        # If Yahoo returns no text description, run an explicit Wikipedia brief summary extraction
+        if not business_summary or len(business_summary) < 50:
+            import wikipediaapi
+            try:
+                # Set up a generic user agent header to comply with Wikipedia API terms
+                wiki = wikipediaapi.Wikipedia(
+                    user_agent='QuantShieldFinanceApp/1.0 (contact@example.com)',
+                    language='en'
+                )
+                
+                # Clean up stock legal extensions to find the root core corporate name
+                clean_search_name = company_name.replace("Limited", "").replace("Ltd", "").replace("Inc.", "").replace("Corporation", "").strip()
+                page = wiki.page(clean_search_name)
+                
+                if page.exists():
+                    # Extract the first 3 summary sentences for a clean, true description of operations
+                    business_summary = " ".join(page.summary.split(". ")[:3]) + "."
+                else:
+                    # Generic alternative fallback if wikipedia page doesn't map cleanly
+                    business_summary = (
+                        f"{company_name} is a leading global enterprise operating within the "
+                        f"{info.get('sector', 'commercial')} sector and specializing in the "
+                        f"{info.get('industry', 'industrial')} market domain. You can review full financial performance grids below."
+                    )
+            except Exception:
+                business_summary = "Corporate background profiles are currently restricted or loading via local metrics tables below."
 
+        # Render under a clean, expanded header
+        with st.expander("📋 About the Company", expanded=True):
+            st.markdown("### Corporate Profile Summary")
+            st.write(business_summary)
         # -------------------------------------------------------------
         # TECHNICAL TRACKING ENGINE
         # -------------------------------------------------------------
