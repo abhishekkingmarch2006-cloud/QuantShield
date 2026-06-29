@@ -57,12 +57,6 @@ if ticker_input:
         # -------------------------------------------------------------
         # CORPORATE BRANDING EXTRACTION
         # -------------------------------------------------------------
-        st.markdown("---")
-        head_col1, head_col2 = st.columns([1, 6])
-        company_name = info.get('longName', ticker_upper)
-        website = info.get('website', '')
-        currency_label = info.get('currency', 'Units')
-        
         with head_col1:
             if website:
                 # Advanced domain cleaning to ensure Clearbit API can read the URL format
@@ -80,14 +74,6 @@ if ticker_input:
                     st.markdown("## 🏢")
             else:
                 st.markdown("## 🏢")
-                
-        with head_col2:
-            st.title(company_name)
-            if website: st.markdown(f"🔗 [Visit Official Website]({website})")
-            
-        with st.expander("📋 View Summary Profile Description"):
-            st.write(info.get('longBusinessSummary', 'No corporate summary description available for this asset index tier.'))
-
         # -------------------------------------------------------------
         # TECHNICAL TRACKING ENGINE
         # -------------------------------------------------------------
