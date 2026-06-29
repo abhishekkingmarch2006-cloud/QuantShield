@@ -2,5 +2,5 @@ streamlit
 yfinance 
 pandas 
 ta
-matplotlib.pyplot 
+matplotlib
 seaborn 
