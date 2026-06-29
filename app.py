@@ -28,7 +28,6 @@ if ticker_input:
     
     with st.spinner("Fetching market telemetry from data streams..."):
         ticker_obj = yf.Ticker(ticker_input)
-        # 5-Year data download covers our historical baseline and long term ARIMA limits
         hist_data = ticker_obj.history(period="5y")
         
         try:
@@ -37,35 +36,31 @@ if ticker_input:
             info = {}
 
     if hist_data.empty:
-        st.error(f"❌ No asset data found for symbol '{ticker_input}'. Ensure the ticker layout match market rules.")
+        st.error(f"❌ No asset data found for symbol '{ticker_input}'. Ensure the ticker layout matches market rules.")
     else:
-        # -------------------------------------------------------------
         # ⚡ CRITICAL DATA EXTRACTION ENGINE (FIX FOR INDIAN MULTIINDEX)
-        # -------------------------------------------------------------
         df = hist_data.copy()
         
-        # If columns contain MultiIndex tiers (Common with Indian markets via yfinance), extract the 'Close' slice explicitly
         if isinstance(df.columns, pd.MultiIndex):
             close_series = df['Close'][ticker_upper].dropna() if ticker_upper in df['Close'].columns else df['Close'].iloc[:, 0].dropna()
         else:
             close_series = df['Close'].dropna()
             
-        # Convert index safely to clean timezone-naive datetimes
         close_series.index = pd.to_datetime(close_series.index).tz_localize(None)
         close_series = close_series.astype(float)
 
-       # -------------------------------------------------------------
-        # BRANDING HEADER: LOGO & DESCRIPTION (FIXED INDENTATION)
+        # -------------------------------------------------------------
+        # 🏛️ ADVANCED LOGO & DESCRIPTION FALLBACK ENGINE
         # -------------------------------------------------------------
         st.markdown("---")
-        
-        # Create columns layout securely
         head_col1, head_col2 = st.columns([1, 6])
         
         company_name = info.get('longName', ticker_upper)
         website = info.get('website', '')
         currency_label = info.get('currency', 'Units')
         
+        # Determine the cleanest domain or logo asset link possible
+        logo_success = False
         with head_col1:
             if website:
                 clean_domain = website.lower().strip()
@@ -77,36 +72,63 @@ if ticker_input:
                 logo_url = f"https://logo.clearbit.com/{clean_domain}?size=120"
                 try: 
                     st.image(logo_url, width=120)
-                except Exception: 
-                    st.markdown("## 🏢")
-            else:
+                    logo_success = True
+                except Exception:
+                    pass
+            
+            # Fallback 1: Try fetching via DuckDuckGo Instant Brand Assets if Clearbit fails
+            if not logo_success:
+                try:
+                    search_name = company_name.split()[0].lower()
+                    ddg_logo = f"https://icons.duckduckgo.com/ip3/{search_name}.com.ico"
+                    st.image(ddg_logo, width=80)
+                    logo_success = True
+                except Exception:
+                    pass
+                    
+            # Fallback 2: Default to generic building graphic
+            if not logo_success:
                 st.markdown("## 🏢")
                 
         with head_col2:
             st.title(company_name)
             if website: 
                 st.markdown(f"🔗 [Visit Official Website]({website})")
+            else:
+                st.markdown(f"📍 Market Symbol: `{ticker_upper}` | Currency: `{currency_label}`")
             
-        # Extract description using multiple fallback keys securely
-        business_summary = info.get('longBusinessSummary', info.get('description', 'No corporate summary description available.'))
+        # Smart Fallback for Summary Profile Description
+        business_summary = info.get('longBusinessSummary', info.get('description', ''))
+        
+        if not business_summary or len(business_summary) < 10:
+            # Build a dynamic overview using available classification metadata tags
+            sector = info.get('sector', 'Global Markets')
+            industry = info.get('industry', 'Financial Assets')
+            country = info.get('country', 'International Exchange')
+            exchange = info.get('exchange', 'Public Exchange')
+            
+            business_summary = (
+                f"**{company_name}** is a publicly traded corporate entity listed under ticker symbol **{ticker_upper}** "
+                f"on the **{exchange}**. The organization operationally falls within the **{sector}** sector, specializing "
+                f"closely in the **{industry}** industrial market category. Headquartered primarily within **{country}**, "
+                f"the stock's telemetry, valuation metrics, and underlying capital balances are actively maintained "
+                f"and updated below."
+            )
         
         with st.expander("📋 View Summary Profile Description", expanded=True):
             st.write(business_summary)
+
         # -------------------------------------------------------------
         # TECHNICAL TRACKING ENGINE
         # -------------------------------------------------------------
         st.markdown("---")
         st.header("📈 Technical Analysis & Price Forecasting Engine")
         
-        # Pull 1 Year subset out of the cleaned series for the layout tracking view
         close_1y = close_series.tail(252)
-        
-        # Calculate clean indicator paths
         sma_50 = ta.trend.sma_indicator(close_1y, window=50)
         ema_20 = ta.trend.ema_indicator(close_1y, window=20)
         rsi_14 = ta.momentum.rsi(close_1y, window=14)
         
-        # Metric indicators layout cards row
         latest_close = close_1y.iloc[-1]
         latest_rsi = rsi_14.iloc[-1] if not pd.isna(rsi_14.iloc[-1]) else 50.0
         latest_sma = sma_50.iloc[-1]
@@ -119,16 +141,14 @@ if ticker_input:
         
         if not pd.isna(latest_sma):
             trend_delta = "Bullish Track" if latest_close > latest_sma else "Bearish Track"
-            m_col3.metric("50-Day Moving Average", f"{latest_sma:.2f} {currency_label}", delta=trend_delta)
+            m_col3.metric("50-Day Moving Average", f"{latest_sma:.2f} {currency_label}", delta=trend_status if 'trend_status' in locals() else trend_delta)
         else:
             m_col3.metric("50-Day Moving Average", "Processing Setup...")
 
-        # DE-CLUTTER TABS: Split current active charting and long term prediction engines
         tech_tab1, tech_tab2 = st.tabs(["📊 1-Year Active Tracking Charts", "🔮 5-Year Statistical Projections"])
         
         with tech_tab1:
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 7), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-            
             ax1.plot(close_1y.index, close_1y.values, label="Closing Price", color="black", linewidth=1.5)
             ax1.plot(close_1y.index, ema_20.values, label="20 EMA", color="orange", linestyle="--")
             if not sma_50.dropna().empty:
@@ -148,14 +168,12 @@ if ticker_input:
             plt.close(fig)
             
         with tech_tab2:
-            with st.spinner("Executing Auto-ARIMA math structures across weekly historical aggregates..."):
+            with st.spinner("Executing Auto-ARIMA math structures..."):
                 try:
-                    # Sample weekly to keep long projections visually clean and fast
                     weekly_series = close_series.resample('W-MON').mean().dropna()
                     model = auto_arima(weekly_series, seasonal=False, error_action='ignore', suppress_warnings=True)
                     fitted = model.fit(weekly_series)
                     
-                    # Project 260 weeks out (~5 Years)
                     forecast_val, conf_int = fitted.predict(n_periods=260, return_conf_int=True)
                     forecast_idx = pd.date_range(start=weekly_series.index[-1] + pd.DateOffset(weeks=1), periods=260, freq='W-MON')
                     f_series = pd.Series(forecast_val, index=forecast_idx)
@@ -164,8 +182,8 @@ if ticker_input:
                     with p_col1:
                         fig_arima, ax_arima = plt.subplots(figsize=(10, 5))
                         ax_arima.plot(weekly_series.index, weekly_series.values, label="Historical Data", color="blue")
-                        ax_arima.plot(f_series.index, f_series.values, label="ARIMA Path Prediction", color="red", linestyle="--")
-                        ax_arima.fill_between(f_series.index, conf_int[:, 0], conf_int[:, 1], color='pink', alpha=0.3, label='Confidence Frame')
+                        ax_arima.plot(f_series.index, f_series.values, label="ARIMA Prediction", color="red", linestyle="--")
+                        ax_arima.fill_between(f_series.index, conf_int[:, 0], conf_int[:, 1], color='pink', alpha=0.3)
                         ax_arima.set_ylabel(f"Price ({currency_label})")
                         ax_arima.legend(loc="upper left")
                         ax_arima.grid(True, alpha=0.2)
@@ -174,11 +192,9 @@ if ticker_input:
                     with p_col2:
                         fig_hist, ax_hist = plt.subplots(figsize=(5, 5))
                         sns.histplot(f_series, kde=True, color="teal", ax=ax_hist)
-                        ax_hist.set_title("Forecast Value Density Distribution")
                         st.pyplot(fig_hist)
                         plt.close(fig_hist)
                         
-                    # Target checkpoints breakdown
                     st.markdown("**Predicted Price Checkpoints (Year-End Targets):**")
                     checkpoints = f_series.resample('YE').last()
                     c_cols = st.columns(len(checkpoints))
@@ -209,7 +225,6 @@ if ticker_input:
             f_col3.metric("P/B Ratio", f"{info.get('priceToBook', 'N/A')}")
             f_col4.metric("Return on Equity (ROE)", f"{info.get('returnOnEquity', 0)*100:.2f}%" if info.get('returnOnEquity') else "N/A")
 
-        # Projections Sub-Engine
         st.subheader("📈 5-Year Statement Value Trajectory Projections")
         if income_statement is not None and not income_statement.empty and income_statement.shape[1] >= 2:
             try:
@@ -218,7 +233,7 @@ if ticker_input:
                     rev_vals = income_statement.loc[rev_label].dropna().values[::-1]
                     n = min(3, len(rev_vals)-1)
                     cagr = ((rev_vals[-1] / rev_vals[-1-n]) ** (1/n)) - 1
-                    cagr = max(min(cagr, 0.25), -0.15) # Cap boundaries to keep visualization logical
+                    cagr = max(min(cagr, 0.25), -0.15)
                     
                     proj_years = [str(datetime.today().year + i) for i in range(1, 6)]
                     proj_rev = []
@@ -236,7 +251,6 @@ if ticker_input:
             except Exception:
                 st.info("Statement row variances are too high to compile reliable forward growth metrics.")
 
-        # Data sheets tabs view
         st.subheader("📋 Core Financial Statements Grid")
         stmt_tab1, stmt_tab2, stmt_tab3 = st.tabs(["Income Statement", "Balance Sheet", "Cash Flow"])
         with stmt_tab1: st.dataframe(income_statement.dropna(how='all') if income_statement is not None else pd.DataFrame(), use_container_width=True)
