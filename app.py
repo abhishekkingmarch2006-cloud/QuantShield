@@ -65,10 +65,19 @@ if ticker_input:
         
         with head_col1:
             if website:
-                clean_domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split('/')[0]
+                # Advanced domain cleaning to ensure Clearbit API can read the URL format
+                clean_domain = website.lower().strip()
+                for prefix in ["https://", "http://", "www."]:
+                    if clean_domain.startswith(prefix):
+                        clean_domain = clean_domain[len(prefix):]
+                # Split at the first slash to isolate just the root domain name (e.g., relianceindustries.com)
+                clean_domain = clean_domain.split('/')[0]
+                
                 logo_url = f"https://logo.clearbit.com/{clean_domain}?size=120"
-                try: st.image(logo_url, width=120)
-                except Exception: st.markdown("## 🏢")
+                try: 
+                    st.image(logo_url, width=120)
+                except Exception: 
+                    st.markdown("## 🏢")
             else:
                 st.markdown("## 🏢")
                 
