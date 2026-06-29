@@ -33,7 +33,7 @@ if ticker:
     else:
         # TIER 1: FUNDAMENTALS & RATIOS
         st.markdown("---")
-        st.header("📊 Tier 1: Screener-Style Fundamental Analysis")
+        st.header("📊 Fundamental Analysis")
         
         col1, col2, col3, col4 = st.columns(4)
         market_cap = info.get('marketCap', 0) / 10000000 
@@ -50,7 +50,7 @@ if ticker:
 
         # TIER 2: TECHNICAL INDICATORS
         st.markdown("---")
-        st.header("📈 Tier 2: TradingView-Style Technical Indicator Analysis")
+        st.header("📈 Technical Indicator Analysis")
         
         df = hist_data.copy()
         
